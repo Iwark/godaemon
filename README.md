@@ -38,8 +38,8 @@ func main() {
     log.Fatal(err)
     return
   }
+  defer f.Close()
   log.SetOutput(f)
-  f.Close()
 
   // anything to do ...
 }
