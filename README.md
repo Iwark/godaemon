@@ -1,12 +1,12 @@
-daemongo
+godaemon
 ===
 
-``daemongo`` is a simple Go(golang) daemon package.
+``godaemon`` is a simple Go(golang) daemon package.
 
 ## Installation
 
 ```
-$ go get github.com/Iwark/daemongo
+$ go get -u github.com/Iwark/godaemon
 ```
 
 ## Example
@@ -18,7 +18,7 @@ import (
   "flag"
   "log"
 
-  "github.com/Iwark/daemongo"
+  "github.com/Iwark/godaemon"
 )
 
 var (
@@ -29,10 +29,17 @@ var (
 func main() {
 
   flag.Parse()
-  if err := daemongo.Start(*child, *logfile); err != nil {
+  if err := godaemon.Start(*child); err != nil {
     log.Fatal(err)
     return
   }
+  f, err := godaemon.OutputFile(*logfile)
+  if err != nil {
+    log.Fatal(err)
+    return
+  }
+  log.SetOutput(f)
+  f.Close()
 
   // anything to do ...
 }

@@ -1,4 +1,4 @@
-package daemongo
+package godaemon
 
 import (
 	"errors"
@@ -18,9 +18,9 @@ const (
 	DaemonFailure
 )
 
-func Start(child bool, logfile string) error {
+func Start(child bool) error {
 	if child {
-		return childMain(logfile)
+		return childMain()
 	}
 	if err := parentMain(); err != nil {
 		log.Fatalf("Error occurred [%v]", err)
@@ -30,11 +30,22 @@ func Start(child bool, logfile string) error {
 	}
 }
 
+func OutputFile(logfile string) (*os.File, error) {
+	logfilepath, err := filepath.Abs(logfile)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(logfilepath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 func parentMain() (err error) {
 	args := []string{"--child"}
 	args = append(args, os.Args[1:]...)
 
-	// 子プロセスとのパイプを作っておく
 	r, w, err := os.Pipe()
 	if err != nil {
 		return err
@@ -48,7 +59,6 @@ func parentMain() (err error) {
 		return err
 	}
 
-	// パイプから子プロセスの起動状態を取得する
 	var status int = DaemonStart
 	go func() {
 		buf := make([]byte, 1)
@@ -61,7 +71,6 @@ func parentMain() (err error) {
 		}
 	}()
 
-	// 子プロセスの起動を30秒待つ
 	i := 0
 	for i < 60 {
 		if status != DaemonStart {
@@ -72,7 +81,6 @@ func parentMain() (err error) {
 		i++
 	}
 
-	// 親プロセス終了
 	if status == DaemonSuccess {
 		return nil
 	} else {
@@ -80,10 +88,9 @@ func parentMain() (err error) {
 	}
 }
 
-func childMain(logfile string) error {
+func childMain() error {
 	var err error
 
-	// 子プロセスの起動状態を親プロセスに通知する
 	pipe := os.NewFile(uintptr(3), "pipe")
 	if pipe != nil {
 		defer pipe.Close()
@@ -94,35 +101,15 @@ func childMain(logfile string) error {
 		}
 	}
 
-	// logのファイルパスを絶対パスにする
-	logfilepath, err := filepath.Abs(logfile)
-	if err != nil {
-		return err
-	}
-
-	// ログの出力先をファイルに。
-	f, err := os.OpenFile(logfilepath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	log.SetOutput(f)
-
-	// SIGCHILDを無視する
 	signal.Ignore(syscall.SIGCHLD)
 
-	// STDOUT, STDIN, STDERRをクローズ
 	syscall.Close(0)
 	syscall.Close(1)
 	syscall.Close(2)
 
-	// プロセスグループリーダーになる
 	syscall.Setsid()
-
-	// Umaskをクリア
 	syscall.Umask(022)
 
-	// / にchdirする
 	// syscall.Chdir("/")
 
 	return nil
